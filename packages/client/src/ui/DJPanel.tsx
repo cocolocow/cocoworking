@@ -15,11 +15,12 @@ interface DJPanelProps {
   onVolume: (vol: number) => void;
   onAddTrack: (url: string) => void;
   onUpdateTitle: (youtubeId: string, title: string) => void;
+  onPlayerReady?: (player: YouTubePlayer) => void;
 }
 
 export function DJPanel({
   djState, isLocalDJ, onClaim, onRelease,
-  onPlay, onPause, onNext, onPrev, onVolume, onAddTrack, onUpdateTitle,
+  onPlay, onPause, onNext, onPrev, onVolume, onAddTrack, onUpdateTitle, onPlayerReady,
 }: DJPanelProps) {
   const [urlInput, setUrlInput] = useState("");
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -38,6 +39,7 @@ export function DJPanel({
         const t = getCurrentTrack(djState);
         if (t) onUpdateTitle(t.youtubeId, title);
       });
+      onPlayerReady?.(player);
     });
 
     return () => { player.destroy(); };

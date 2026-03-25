@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createGame } from "../game-logic/createGame";
 import { CoworkingScene } from "../scenes/CoworkingScene";
+import { YouTubePlayer } from "../game-logic/YouTubePlayer";
 import { Lobby } from "./Lobby";
 import { Chat } from "./Chat";
 import { PlayerCount } from "./PlayerCount";
 import { DJPanel } from "./DJPanel";
 import { PomodoroBar } from "./PomodoroBar";
+import { AudioControl } from "./AudioControl";
 import type { ChatMessage, DJState, PomodoroState } from "@cocoworking/shared";
 import { createDJState } from "@cocoworking/shared";
 
@@ -13,6 +15,7 @@ export function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<CoworkingScene | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const ytPlayerRef = useRef<YouTubePlayer | null>(null);
 
   const [inLobby, setInLobby] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,7 +51,6 @@ export function App() {
           () => setPomodoro(null),
         );
 
-        // Get socket ID once connected
         const poll = setInterval(() => {
           const id = scene.getNetwork()?.getSocketId();
           if (id) { setSocketId(id); clearInterval(poll); }
@@ -67,7 +69,14 @@ export function App() {
     sceneRef.current?.sendChat(content);
   }, []);
 
-  // DJ controls
+  const handleLocalVolume = useCallback((volume: number) => {
+    ytPlayerRef.current?.setVolume(volume);
+  }, []);
+
+  const handleMuteToggle = useCallback((muted: boolean) => {
+    ytPlayerRef.current?.setVolume(muted ? 0 : 50);
+  }, []);
+
   const net = () => sceneRef.current?.getNetwork();
 
   if (inLobby) {
@@ -107,6 +116,12 @@ export function App() {
         onVolume={(v) => net()?.djVolume(v)}
         onAddTrack={(url) => net()?.djAddTrack(url)}
         onUpdateTitle={(id, title) => net()?.djUpdateTitle(id, title)}
+        onPlayerReady={(player) => { ytPlayerRef.current = player; }}
+      />
+
+      <AudioControl
+        onVolumeChange={handleLocalVolume}
+        onMuteToggle={handleMuteToggle}
       />
     </>
   );
