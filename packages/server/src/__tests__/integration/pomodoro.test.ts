@@ -29,7 +29,12 @@ function waitFor<T>(socket: Socket, event: string): Promise<T> {
 
 describe("Pomodoro integration", () => {
   let sockets: Socket[] = [];
-  afterEach(() => { sockets.forEach((s) => s.disconnect()); sockets = []; });
+  afterEach(async () => {
+    sockets.forEach((s) => s.disconnect());
+    sockets = [];
+    // Wait for server to process disconnects and cleanup pomodoro state
+    await new Promise((r) => setTimeout(r, 150));
+  });
 
   it("starts a pomodoro session", async () => {
     const s = connect("Coco");

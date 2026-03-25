@@ -117,15 +117,18 @@ export class YouTubePlayer {
   }
 
   play() {
-    this.player?.playVideo();
+    if (!this.ready) return;
+    this.player?.playVideo?.();
   }
 
   pause() {
-    this.player?.pauseVideo();
+    if (!this.ready) return;
+    this.player?.pauseVideo?.();
   }
 
   setVolume(volume: number) {
-    this.player?.setVolume(volume);
+    if (!this.ready) return;
+    this.player?.setVolume?.(volume);
   }
 
   getTitle(): string {

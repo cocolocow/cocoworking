@@ -14,23 +14,20 @@ import {
 import { NetworkManager } from "../game-logic/NetworkManager";
 import { ProximityManager } from "../game-logic/ProximityManager";
 import type { Player, ChatMessage, Direction } from "@cocoworking/shared";
+import { ROOM_LAYOUT, OBSTACLE_POSITIONS } from "./roomLayout";
 
 const ROOM_WIDTH = 10;
 const ROOM_HEIGHT = 10;
-const MOVE_COOLDOWN = 180; // ms between keyboard moves
+const MOVE_COOLDOWN = 180;
 
 const AVATAR_COLORS = [
   0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3,
   0x54a0ff, 0x5f27cd, 0x01a3a4, 0xf368e0,
 ];
 
-const DESK_POSITIONS = [
-  { x: 2, y: 2 }, { x: 2, y: 5 },
-  { x: 7, y: 3 }, { x: 7, y: 6 },
-];
+const OBSTACLES = new Set(OBSTACLE_POSITIONS);
 
-// Obstacle set: desks block movement
-const OBSTACLES = new Set(DESK_POSITIONS.map((p) => posKey(p)));
+const A = "assets/tinyhouse";
 
 interface RemotePlayerData {
   container: Phaser.GameObjects.Container;
@@ -38,7 +35,6 @@ interface RemotePlayerData {
 }
 
 export class CoworkingScene extends Phaser.Scene {
-  // Player state
   private playerContainer!: Phaser.GameObjects.Container;
   private playerGridPos = { x: 5, y: 5 };
   private playerDirection: Direction = "south";
@@ -47,22 +43,16 @@ export class CoworkingScene extends Phaser.Scene {
   private isMoving = false;
   private lastMoveTime = 0;
 
-  // Remote players
   private remotePlayers = new Map<string, RemotePlayerData>();
-
-  // Network
   private network!: NetworkManager;
   private proximity = new ProximityManager();
 
-  // Camera
   private offsetX = 0;
   private offsetY = 0;
 
-  // Input
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
 
-  // Chat bridge
   private chatMessages: Array<ChatMessage> = [];
   private onChatUpdate?: (messages: ChatMessage[]) => void;
   private onPlayerCountUpdate?: (count: number) => void;
@@ -80,16 +70,103 @@ export class CoworkingScene extends Phaser.Scene {
     if (data.playerColor) this.playerColor = data.playerColor;
   }
 
+  // ─── Preload ──────────────────────────────────────
+
+  preload() {
+    // Loading bar
+    const bar = this.add.graphics();
+    const loadText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 20, "Chargement...", {
+      fontSize: "14px", fontFamily: "monospace", color: "#ffffff",
+    }).setOrigin(0.5);
+    this.load.on("progress", (v: number) => {
+      bar.clear();
+      bar.fillStyle(0x6c5ce7, 1);
+      bar.fillRect(this.scale.width / 2 - 150, this.scale.height / 2, 300 * v, 8);
+    });
+    this.load.on("complete", () => { bar.destroy(); loadText.destroy(); });
+
+    // Floors & Walls
+    this.load.image("floor-wood", `${A}/floors/floor_wood.png`);
+    this.load.image("floor-dark", `${A}/floors/floor_wood_dark.png`);
+    this.load.image("wall-left", `${A}/walls/wall_brick.png`);   // faces right
+    this.load.image("wall-back", `${A}/walls/wall_brick2.png`);  // faces left
+
+    // Furniture
+    this.load.image("desk", `${A}/furniture/desk.png`);
+    this.load.image("desk-b", `${A}/furniture/desk_b.png`);
+    this.load.image("chair-a", `${A}/furniture/chair_a.png`);
+    this.load.image("chair-b", `${A}/furniture/chair_b.png`);
+    this.load.image("chair-c", `${A}/furniture/chair_c.png`);
+    this.load.image("chair-d", `${A}/furniture/chair_d.png`);
+    this.load.image("gchair-a", `${A}/furniture/gchair_a.png`);
+    this.load.image("gchair-b", `${A}/furniture/gchair_b.png`);
+    this.load.image("gchair-c", `${A}/furniture/gchair_c.png`);
+    this.load.image("gchair-d", `${A}/furniture/gchair_d.png`);
+    this.load.image("sofa-a", `${A}/furniture/sofa_a.png`);
+    this.load.image("sofa-b", `${A}/furniture/sofa_b.png`);
+    this.load.image("pillow", `${A}/furniture/pillow.png`);
+
+    // PC / Monitors
+    this.load.image("imac-a", `${A}/pc/imac_a.png`);
+    this.load.image("imac-b", `${A}/pc/imac_b.png`);
+    this.load.image("keyboard", `${A}/pc/keyboard.png`);
+    this.load.image("pc-tower", `${A}/pc/pc_tower.png`);
+    this.load.image("wacom", `${A}/pc/wacom.png`);
+
+    // Decor
+    this.load.image("plant-1", `${A}/decor/plant_1.png`);
+    this.load.image("plant-2", `${A}/decor/plant_2.png`);
+    this.load.image("cactus-1", `${A}/decor/cactus_1.png`);
+    this.load.image("cactus-2", `${A}/decor/cactus_2.png`);
+    this.load.image("sunflower", `${A}/decor/sunflower.png`);
+    this.load.image("carpet", `${A}/decor/carpet.png`);
+
+    // Animation frames
+    for (let i = 1; i <= 25; i++) {
+      this.load.image(`lava-${i}`, `${A}/animations/lava_lamp/frame_${i}.png`);
+    }
+    for (let i = 1; i <= 13; i++) {
+      this.load.image(`macbook-${i}`, `${A}/animations/macbook/${this.getMacbookFrameName(i)}`);
+    }
+    for (let i = 1; i <= 18; i++) {
+      this.load.image(`bscreen-${i}`, `${A}/animations/bended_screen/frame_${i}.png`);
+    }
+    for (let i = 1; i <= 9; i++) {
+      this.load.image(`pctower-${i}`, `${A}/animations/pc_tower/frame_${i}.png`);
+    }
+    for (let i = 1; i <= 20; i++) {
+      this.load.image(`cat-${i}`, `${A}/animations/cat/frame_${i}.png`);
+    }
+  }
+
+  private getMacbookFrameName(i: number): string {
+    // Files are named: macbook_1_closed_tile.png, macbook_1_open_tile.png, macbook_1_tile_ani_1.png...
+    const names = [
+      "macbook_1_closed_tile.png",
+      "macbook_1_open_tile.png",
+      "macbook_1_tile_ani_1.png", "macbook_1_tile_ani_2.png", "macbook_1_tile_ani_3.png",
+      "macbook_1_tile_ani_4.png", "macbook_1_tile_ani_5.png", "macbook_1_tile_ani_6.png",
+      "macbook_1_tile_ani_7.png", "macbook_1_tile_ani_8.png", "macbook_1_tile_ani_9.png",
+      "macbook_1_tile_ani_10.png", "macbook_1_tile_ani_11.png",
+    ];
+    return names[i - 1] || names[0];
+  }
+
+  // ─── Create ───────────────────────────────────────
+
   create() {
     this.offsetX = this.scale.width / 2;
     this.offsetY = 150;
 
-    // Draw room
+    // Create animations
+    this.createAnimations();
+
+    // Draw room with sprites
+    this.drawFloor();
     this.drawWalls();
-    this.drawIsometricFloor();
     this.drawFurniture();
 
-    // Create local player
+    // Local player (still programmatic — waiting for character pack)
     this.playerContainer = this.createAvatarContainer(
       this.playerGridPos, this.playerColor, this.playerName, this.playerDirection
     );
@@ -117,9 +194,149 @@ export class CoworkingScene extends Phaser.Scene {
       }
     });
 
-    // Network
     this.connectToServer();
   }
+
+  private createAnimations() {
+    this.anims.create({
+      key: "lava-lamp-anim",
+      frames: Array.from({ length: 25 }, (_, i) => ({ key: `lava-${i + 1}` })),
+      frameRate: 5, repeat: -1,
+    });
+    this.anims.create({
+      key: "macbook-anim",
+      frames: Array.from({ length: 11 }, (_, i) => ({ key: `macbook-${i + 3}` })),
+      frameRate: 6, repeat: -1,
+    });
+    this.anims.create({
+      key: "bscreen-anim",
+      frames: Array.from({ length: 18 }, (_, i) => ({ key: `bscreen-${i + 1}` })),
+      frameRate: 8, repeat: -1,
+    });
+    this.anims.create({
+      key: "pctower-anim",
+      frames: Array.from({ length: 9 }, (_, i) => ({ key: `pctower-${i + 1}` })),
+      frameRate: 4, repeat: -1,
+    });
+    this.anims.create({
+      key: "cat-anim",
+      frames: Array.from({ length: 20 }, (_, i) => ({ key: `cat-${i + 1}` })),
+      frameRate: 5, repeat: -1,
+    });
+  }
+
+  // ─── Floor ────────────────────────────────────────
+
+  private drawFloor() {
+    for (let x = 0; x < ROOM_WIDTH; x++) {
+      for (let y = 0; y < ROOM_HEIGHT; y++) {
+        const s = gridToScreen({ x, y });
+        const key = (x + y) % 2 === 0 ? "floor-wood" : "floor-dark";
+        const tile = this.add.image(
+          s.screenX + this.offsetX,
+          s.screenY + this.offsetY,
+          key
+        );
+        tile.setOrigin(0.5, 0.5);
+        tile.setDepth(0);
+      }
+    }
+  }
+
+  // ─── Walls ────────────────────────────────────────
+
+  private drawWalls() {
+    // Left wall (x=0 edge, along y axis) — brick faces RIGHT into the room
+    for (let y = 0; y < ROOM_HEIGHT; y++) {
+      const s = gridToScreen({ x: 0, y });
+      // Align to the left vertex of the tile diamond
+      const wall = this.add.image(
+        s.screenX + this.offsetX - TILE_WIDTH / 4,
+        s.screenY + this.offsetY,
+        "wall-left"
+      );
+      wall.setOrigin(0.5, 1.0);
+      wall.setDepth(0);
+    }
+
+    // Back wall (y=0 edge, along x axis) — brick faces LEFT into the room
+    for (let x = 0; x < ROOM_WIDTH; x++) {
+      const s = gridToScreen({ x, y: 0 });
+      // Align to the top-right vertex of the tile diamond
+      const wall = this.add.image(
+        s.screenX + this.offsetX + TILE_WIDTH / 4,
+        s.screenY + this.offsetY,
+        "wall-back"
+      );
+      wall.setOrigin(0.5, 1.0);
+      wall.setDepth(0);
+    }
+  }
+
+  // ─── Furniture ────────────────────────────────────
+
+  private drawFurniture() {
+    // Carpet in lounge area (depth just above floor)
+    this.placeSprite({ x: 5, y: 5 }, "carpet", 0.5, 0.5, 0.1);
+
+    // Place all furniture from layout config (edit roomLayout.ts to reposition)
+    for (const item of ROOM_LAYOUT) {
+      if (item.anim) {
+        this.placeAnimated(
+          { x: item.gx, y: item.gy },
+          item.texture, item.anim,
+          item.originX, item.originY, item.depth, item.yOffset
+        );
+      } else {
+        this.placeSprite(
+          { x: item.gx, y: item.gy },
+          item.texture, item.originX, item.originY, item.depth, item.yOffset
+        );
+      }
+    }
+  }
+
+  private placeSprite(
+    pos: { x: number; y: number },
+    texture: string,
+    originX = 0.5,
+    originY = 0.75,
+    depthOffset = 0,
+    yOffset = 0,
+  ): Phaser.GameObjects.Image {
+    const s = gridToScreen(pos);
+    const img = this.add.image(
+      s.screenX + this.offsetX,
+      s.screenY + this.offsetY + yOffset,
+      texture
+    );
+    img.setOrigin(originX, originY);
+    img.setDepth(getDepth(pos) + depthOffset);
+    return img;
+  }
+
+  private placeAnimated(
+    pos: { x: number; y: number },
+    initialFrame: string,
+    animKey: string,
+    originX = 0.5,
+    originY = 0.75,
+    depthOffset = 0,
+    yOffset = 0,
+  ): Phaser.GameObjects.Sprite {
+    const s = gridToScreen(pos);
+    const sprite = this.add.sprite(
+      s.screenX + this.offsetX,
+      s.screenY + this.offsetY + yOffset,
+      initialFrame
+    );
+    sprite.setOrigin(originX, originY);
+    sprite.setDepth(getDepth(pos) + depthOffset);
+    sprite.play(animKey);
+    return sprite;
+  }
+
+  // ─── Update ───────────────────────────────────────
 
   update(time: number) {
     if (this.isMoving) return;
@@ -141,6 +358,8 @@ export class CoworkingScene extends Phaser.Scene {
     this.proximity.setLocalPosition(target);
   }
 
+  // ─── Public API ───────────────────────────────────
+
   setChatCallback(cb: (msgs: ChatMessage[]) => void) { this.onChatUpdate = cb; }
   setPlayerCountCallback(cb: (n: number) => void) { this.onPlayerCountUpdate = cb; }
   setProximityCallback(cb: (ids: string[]) => void) { this.onProximityUpdate = cb; }
@@ -153,7 +372,7 @@ export class CoworkingScene extends Phaser.Scene {
   getNetwork() { return this.network; }
   getProximityManager() { return this.proximity; }
 
-  // ─── Network ────────────────────────────────────────
+  // ─── Network ──────────────────────────────────────
 
   private connectToServer() {
     const serverUrl = `http://${window.location.hostname}:2567`;
@@ -193,13 +412,10 @@ export class CoworkingScene extends Phaser.Scene {
   private async initProximity() {
     const socketId = this.network.getSocketId();
     if (!socketId) return;
-
     try {
       const peerId = await this.proximity.init(socketId);
       this.network.sendPeerId(peerId);
-      this.proximity.setProximityCallback((ids) => {
-        this.onProximityUpdate?.(ids);
-      });
+      this.proximity.setProximityCallback((ids) => { this.onProximityUpdate?.(ids); });
     } catch (err) {
       console.warn("PeerJS init failed, proximity disabled:", err);
     }
@@ -238,7 +454,7 @@ export class CoworkingScene extends Phaser.Scene {
     });
   }
 
-  // ─── Chat ───────────────────────────────────────────
+  // ─── Chat ─────────────────────────────────────────
 
   private handleChat(msg: ChatMessage) {
     this.chatMessages.push(msg);
@@ -275,7 +491,7 @@ export class CoworkingScene extends Phaser.Scene {
     });
   }
 
-  // ─── Input ──────────────────────────────────────────
+  // ─── Input ────────────────────────────────────────
 
   private getKeyboardDirection(): KeyDirection | null {
     if (this.cursors.up.isDown || this.wasd.up.isDown) return "up";
@@ -289,7 +505,7 @@ export class CoworkingScene extends Phaser.Scene {
     return pos.x >= 0 && pos.x < ROOM_WIDTH && pos.y >= 0 && pos.y < ROOM_HEIGHT;
   }
 
-  // ─── Movement ───────────────────────────────────────
+  // ─── Movement ─────────────────────────────────────
 
   private movePlayerTo(target: { x: number; y: number }) {
     this.isMoving = true;
@@ -308,7 +524,6 @@ export class CoworkingScene extends Phaser.Scene {
       },
     });
 
-    // Update bubble position if exists
     const bubble = this.playerContainer.getData("bubble") as Phaser.GameObjects.Container | null;
     if (bubble) {
       this.tweens.add({
@@ -320,7 +535,7 @@ export class CoworkingScene extends Phaser.Scene {
     }
   }
 
-  // ─── Avatar Rendering ──────────────────────────────
+  // ─── Avatar (programmatic — until character pack) ─
 
   private createAvatarContainer(
     pos: { x: number; y: number },
@@ -333,71 +548,52 @@ export class CoworkingScene extends Phaser.Scene {
     const sy = screen.screenY + this.offsetY - TILE_HEIGHT;
     const g = this.add.graphics();
 
-    // Shadow
     g.fillStyle(0x000000, 0.2);
     g.fillEllipse(0, 20, 20, 8);
 
-    // Body (isometric character)
     const darker = Phaser.Display.Color.ValueToColor(color).darken(25).color;
     const lighter = Phaser.Display.Color.ValueToColor(color).lighten(15).color;
 
-    // Torso - left face
     g.fillStyle(darker, 1);
     g.fillPoints([
-      new Phaser.Geom.Point(-8, -4),
-      new Phaser.Geom.Point(0, 0),
-      new Phaser.Geom.Point(0, 14),
-      new Phaser.Geom.Point(-8, 10),
+      new Phaser.Geom.Point(-8, -4), new Phaser.Geom.Point(0, 0),
+      new Phaser.Geom.Point(0, 14), new Phaser.Geom.Point(-8, 10),
     ], true);
 
-    // Torso - right face
     g.fillStyle(color, 1);
     g.fillPoints([
-      new Phaser.Geom.Point(8, -4),
-      new Phaser.Geom.Point(0, 0),
-      new Phaser.Geom.Point(0, 14),
-      new Phaser.Geom.Point(8, 10),
+      new Phaser.Geom.Point(8, -4), new Phaser.Geom.Point(0, 0),
+      new Phaser.Geom.Point(0, 14), new Phaser.Geom.Point(8, 10),
     ], true);
 
-    // Torso - top face
     g.fillStyle(lighter, 1);
     g.fillPoints([
-      new Phaser.Geom.Point(0, -8),
-      new Phaser.Geom.Point(8, -4),
-      new Phaser.Geom.Point(0, 0),
-      new Phaser.Geom.Point(-8, -4),
+      new Phaser.Geom.Point(0, -8), new Phaser.Geom.Point(8, -4),
+      new Phaser.Geom.Point(0, 0), new Phaser.Geom.Point(-8, -4),
     ], true);
 
-    // Head (isometric cube)
     const headY = -16;
-    g.fillStyle(0xfad390, 1); // Skin
+    g.fillStyle(0xfad390, 1);
     g.fillPoints([
-      new Phaser.Geom.Point(-6, headY + 0),
-      new Phaser.Geom.Point(0, headY - 4),
-      new Phaser.Geom.Point(6, headY + 0),
-      new Phaser.Geom.Point(0, headY + 4),
+      new Phaser.Geom.Point(-6, headY), new Phaser.Geom.Point(0, headY - 4),
+      new Phaser.Geom.Point(6, headY), new Phaser.Geom.Point(0, headY + 4),
     ], true);
 
-    // Hair on top
     g.fillStyle(darker, 1);
     g.fillPoints([
-      new Phaser.Geom.Point(-6, headY - 2),
-      new Phaser.Geom.Point(0, headY - 6),
-      new Phaser.Geom.Point(6, headY - 2),
-      new Phaser.Geom.Point(0, headY + 0),
+      new Phaser.Geom.Point(-6, headY - 2), new Phaser.Geom.Point(0, headY - 6),
+      new Phaser.Geom.Point(6, headY - 2), new Phaser.Geom.Point(0, headY),
     ], true);
 
-    // Eyes (two small dots based on direction)
     g.fillStyle(0x2d3436, 1);
     if (direction === "south" || direction === "east") {
       g.fillCircle(2, headY - 1, 1);
-      g.fillCircle(5, headY + 0, 1);
+      g.fillCircle(5, headY, 1);
     } else {
       g.fillCircle(-2, headY - 1, 1);
-      g.fillCircle(-5, headY + 0, 1);
+      g.fillCircle(-5, headY, 1);
     }
 
-    // Name label
     const label = this.add.text(0, -30, name, {
       fontSize: "9px", fontFamily: "monospace", color: "#ffffff",
       stroke: "#000000", strokeThickness: 3,
@@ -406,214 +602,6 @@ export class CoworkingScene extends Phaser.Scene {
     const container = this.add.container(sx, sy, [g, label]);
     container.setDepth(getDepth(pos) + 1);
     return container;
-  }
-
-  // ─── Room Rendering ─────────────────────────────────
-
-  private drawWalls() {
-    const g = this.add.graphics();
-    const wallH = 40;
-
-    // Left wall (x=0 edge)
-    for (let y = 0; y < ROOM_HEIGHT; y++) {
-      const s = gridToScreen({ x: 0, y });
-      const sx = s.screenX + this.offsetX;
-      const sy = s.screenY + this.offsetY;
-
-      g.fillStyle(0x4a4a6a, 1);
-      g.fillPoints([
-        new Phaser.Geom.Point(sx - TILE_WIDTH / 2, sy),
-        new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2),
-        new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2 - wallH),
-        new Phaser.Geom.Point(sx - TILE_WIDTH / 2, sy - wallH),
-      ], true);
-      g.lineStyle(1, 0x636e72, 0.3);
-      g.strokePath();
-
-      // Window on every 3rd tile
-      if (y % 3 === 1) {
-        const wx = sx - TILE_WIDTH / 4;
-        const wy = sy - wallH / 2 - 4;
-        g.fillStyle(0x74b9ff, 0.3);
-        g.fillRect(wx - 4, wy - 6, 8, 10);
-        g.lineStyle(1, 0x636e72, 0.5);
-        g.strokeRect(wx - 4, wy - 6, 8, 10);
-      }
-    }
-
-    // Right wall (y=0 edge)
-    for (let x = 0; x < ROOM_WIDTH; x++) {
-      const s = gridToScreen({ x, y: 0 });
-      const sx = s.screenX + this.offsetX;
-      const sy = s.screenY + this.offsetY;
-
-      g.fillStyle(0x3a3a5a, 1);
-      g.fillPoints([
-        new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2),
-        new Phaser.Geom.Point(sx + TILE_WIDTH / 2, sy),
-        new Phaser.Geom.Point(sx + TILE_WIDTH / 2, sy - wallH),
-        new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2 - wallH),
-      ], true);
-      g.lineStyle(1, 0x636e72, 0.3);
-      g.strokePath();
-
-      if (x % 3 === 1) {
-        const wx = sx + TILE_WIDTH / 4;
-        const wy = sy - wallH / 2 - 4;
-        g.fillStyle(0x74b9ff, 0.3);
-        g.fillRect(wx - 4, wy - 6, 8, 10);
-        g.lineStyle(1, 0x636e72, 0.5);
-        g.strokeRect(wx - 4, wy - 6, 8, 10);
-      }
-    }
-
-    g.setDepth(0);
-  }
-
-  private drawIsometricFloor() {
-    const g = this.add.graphics();
-
-    for (let x = 0; x < ROOM_WIDTH; x++) {
-      for (let y = 0; y < ROOM_HEIGHT; y++) {
-        const s = gridToScreen({ x, y });
-        const sx = s.screenX + this.offsetX;
-        const sy = s.screenY + this.offsetY;
-
-        // Warm wood-tone checkerboard
-        const color = (x + y) % 2 === 0 ? 0x3d3226 : 0x4a3c2e;
-
-        g.fillStyle(color, 1);
-        g.fillPoints([
-          new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2),
-          new Phaser.Geom.Point(sx + TILE_WIDTH / 2, sy),
-          new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2),
-          new Phaser.Geom.Point(sx - TILE_WIDTH / 2, sy),
-        ], true);
-        g.lineStyle(1, 0x2d2418, 0.3);
-        g.strokePath();
-      }
-    }
-
-    g.setDepth(0);
-  }
-
-  private drawFurniture() {
-    for (const pos of DESK_POSITIONS) {
-      this.drawDesk(pos);
-    }
-
-    // Plants
-    this.drawPlant({ x: 0, y: 0 });
-    this.drawPlant({ x: 9, y: 0 });
-    this.drawPlant({ x: 0, y: 9 });
-
-    // Rug in the center
-    this.drawRug({ x: 4, y: 4 }, 3, 3);
-  }
-
-  private drawDesk(pos: { x: number; y: number }) {
-    const s = gridToScreen(pos);
-    const sx = s.screenX + this.offsetX;
-    const sy = s.screenY + this.offsetY;
-    const g = this.add.graphics();
-
-    // Desk top
-    g.fillStyle(0x8b6914, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(sx, sy - TILE_HEIGHT / 2 - 8),
-      new Phaser.Geom.Point(sx + TILE_WIDTH / 3, sy - 8),
-      new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2 - 8),
-      new Phaser.Geom.Point(sx - TILE_WIDTH / 3, sy - 8),
-    ], true);
-    g.lineStyle(1, 0x6b5010, 1);
-    g.strokePath();
-
-    // Front face
-    g.fillStyle(0x7a5a12, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2 - 8),
-      new Phaser.Geom.Point(sx + TILE_WIDTH / 3, sy - 8),
-      new Phaser.Geom.Point(sx + TILE_WIDTH / 3, sy),
-      new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2),
-    ], true);
-    g.strokePath();
-
-    // Side face
-    g.fillStyle(0x6b4e10, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2 - 8),
-      new Phaser.Geom.Point(sx - TILE_WIDTH / 3, sy - 8),
-      new Phaser.Geom.Point(sx - TILE_WIDTH / 3, sy),
-      new Phaser.Geom.Point(sx, sy + TILE_HEIGHT / 2),
-    ], true);
-    g.strokePath();
-
-    // Monitor
-    g.fillStyle(0x2d3436, 1);
-    g.fillRect(sx - 6, sy - TILE_HEIGHT / 2 - 20, 12, 10);
-    g.fillStyle(0x74b9ff, 0.8);
-    g.fillRect(sx - 5, sy - TILE_HEIGHT / 2 - 19, 10, 8);
-    // Monitor stand
-    g.fillStyle(0x2d3436, 1);
-    g.fillRect(sx - 1, sy - TILE_HEIGHT / 2 - 10, 2, 3);
-
-    // Chair in front (offset +1 in y direction)
-    const chairS = gridToScreen({ x: pos.x, y: pos.y + 1 });
-    const cx = chairS.screenX + this.offsetX;
-    const cy = chairS.screenY + this.offsetY;
-    g.fillStyle(0x636e72, 1);
-    g.fillCircle(cx, cy - 6, 5);
-    g.fillStyle(0x4a5568, 1);
-    g.fillRect(cx - 2, cy - 2, 4, 4);
-
-    g.setDepth(getDepth(pos));
-  }
-
-  private drawPlant(pos: { x: number; y: number }) {
-    const s = gridToScreen(pos);
-    const sx = s.screenX + this.offsetX;
-    const sy = s.screenY + this.offsetY;
-    const g = this.add.graphics();
-
-    // Pot
-    g.fillStyle(0xb45309, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(sx - 5, sy - 4),
-      new Phaser.Geom.Point(sx + 5, sy - 4),
-      new Phaser.Geom.Point(sx + 4, sy + 4),
-      new Phaser.Geom.Point(sx - 4, sy + 4),
-    ], true);
-
-    // Leaves
-    g.fillStyle(0x27ae60, 1);
-    g.fillCircle(sx, sy - 10, 7);
-    g.fillCircle(sx - 4, sy - 8, 5);
-    g.fillCircle(sx + 4, sy - 8, 5);
-    g.fillStyle(0x2ecc71, 1);
-    g.fillCircle(sx + 1, sy - 12, 4);
-
-    g.setDepth(getDepth(pos) + 0.5);
-  }
-
-  private drawRug(pos: { x: number; y: number }, w: number, h: number) {
-    const g = this.add.graphics();
-    g.fillStyle(0x6c3483, 0.3);
-
-    const topLeft = gridToScreen(pos);
-    const topRight = gridToScreen({ x: pos.x + w, y: pos.y });
-    const bottomRight = gridToScreen({ x: pos.x + w, y: pos.y + h });
-    const bottomLeft = gridToScreen({ x: pos.x, y: pos.y + h });
-
-    g.fillPoints([
-      new Phaser.Geom.Point(topLeft.screenX + this.offsetX, topLeft.screenY + this.offsetY),
-      new Phaser.Geom.Point(topRight.screenX + this.offsetX, topRight.screenY + this.offsetY),
-      new Phaser.Geom.Point(bottomRight.screenX + this.offsetX, bottomRight.screenY + this.offsetY),
-      new Phaser.Geom.Point(bottomLeft.screenX + this.offsetX, bottomLeft.screenY + this.offsetY),
-    ], true);
-
-    g.lineStyle(1, 0x8e44ad, 0.3);
-    g.strokePath();
-    g.setDepth(0.5);
   }
 }
 

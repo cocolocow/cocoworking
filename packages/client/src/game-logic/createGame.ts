@@ -1,11 +1,14 @@
 import Phaser from "phaser";
 import { CoworkingScene } from "../scenes/CoworkingScene";
+import { RoomEditor } from "../scenes/RoomEditor";
 
 export function createGame(
   parent: HTMLElement,
   playerName: string,
   playerColor: number
 ): Phaser.Game {
+  const isEditor = new URLSearchParams(window.location.search).has("editor");
+
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -20,11 +23,14 @@ export function createGame(
     scene: [],
   });
 
-  // Add scene with init data
-  game.scene.add("CoworkingScene", CoworkingScene, true, {
-    playerName,
-    playerColor,
-  });
+  if (isEditor) {
+    game.scene.add("RoomEditor", RoomEditor, true);
+  } else {
+    game.scene.add("CoworkingScene", CoworkingScene, true, {
+      playerName,
+      playerColor,
+    });
+  }
 
   return game;
 }
