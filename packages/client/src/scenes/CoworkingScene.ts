@@ -20,10 +20,24 @@ const ROOM_WIDTH = 10;
 const ROOM_HEIGHT = 10;
 const MOVE_COOLDOWN = 180;
 
+// Lobby colors (saturated, for UI)
 const AVATAR_COLORS = [
   0xff6b6b, 0x48dbfb, 0xfeca57, 0xff9ff3,
   0x54a0ff, 0x5f27cd, 0x01a3a4, 0xf368e0,
 ];
+
+// Lighter tint versions for sprite coloring (blended toward white)
+// This keeps the character recognizable while giving each player a distinct color
+const AVATAR_TINTS: Record<number, number> = {
+  0xff6b6b: 0xffb0b0, // light red
+  0x48dbfb: 0xa8eeff, // light blue
+  0xfeca57: 0xfff0aa, // light yellow
+  0xff9ff3: 0xffd0f8, // light pink
+  0x54a0ff: 0xb0d0ff, // light indigo
+  0x5f27cd: 0xc8a8ff, // light purple
+  0x01a3a4: 0x90e8e8, // light teal
+  0xf368e0: 0xffc0f0, // light magenta
+};
 
 const OBSTACLES = new Set(OBSTACLE_POSITIONS);
 
@@ -609,7 +623,7 @@ export class CoworkingScene extends Phaser.Scene {
 
   private createAvatarContainer(
     pos: { x: number; y: number },
-    _color: number,
+    color: number,
     name: string,
     direction: Direction,
   ): Phaser.GameObjects.Container {
@@ -617,10 +631,17 @@ export class CoworkingScene extends Phaser.Scene {
     const sx = screen.screenX + this.offsetX;
     const sy = screen.screenY + this.offsetY - TILE_HEIGHT;
 
-    // Character sprite
+    // Character sprite with color tint
     const charSprite = this.add.sprite(0, 0, "char-idle", 0);
     charSprite.setOrigin(0.5, 0.85);
     charSprite.play(`char-idle-${this.directionToAnimDir(direction)}`);
+    const tint = AVATAR_TINTS[color] || 0xffffff;
+    charSprite.setTint(tint);
+
+    // Color dot under name (shows the player's team color)
+    const colorDot = this.add.graphics();
+    colorDot.fillStyle(color, 1);
+    colorDot.fillCircle(0, -32, 3);
 
     // Name label above head
     const label = this.add.text(0, -40, name, {
@@ -628,7 +649,7 @@ export class CoworkingScene extends Phaser.Scene {
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5);
 
-    const container = this.add.container(sx, sy, [charSprite, label]);
+    const container = this.add.container(sx, sy, [charSprite, colorDot, label]);
     container.setDepth(getDepth(pos) + 1);
     return container;
   }
