@@ -45,7 +45,7 @@ export function Chat({ messages, onSend }: ChatProps) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Écrire un message..."
+          placeholder="Write a message..."
           style={styles.input}
           maxLength={200}
         />

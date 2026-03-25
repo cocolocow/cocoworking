@@ -91,7 +91,7 @@ export function DJPanel({
               <div style={styles.artist}>{track.artist}</div>
             </>
           ) : (
-            <div style={styles.noTrack}>Pas de musique</div>
+            <div style={styles.noTrack}>No music</div>
           )}
         </div>
       </div>
@@ -128,16 +128,16 @@ export function DJPanel({
               type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="Coller un lien YouTube..."
+              placeholder="Paste a YouTube link..."
               style={styles.urlInput}
             />
             <button type="submit" style={styles.addBtn}>+</button>
           </form>
 
-          <button onClick={onRelease} style={styles.btnRelease}>Quitter DJ</button>
+          <button onClick={onRelease} style={styles.btnRelease}>Stop DJ</button>
         </>
       ) : !hasDJ ? (
-        <button onClick={onClaim} style={styles.btnClaim}>Devenir DJ</button>
+        <button onClick={onClaim} style={styles.btnClaim}>Become DJ</button>
       ) : (
         /* Non-DJ volume control */
         <div style={styles.controls}>

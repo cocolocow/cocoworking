@@ -1,65 +1,66 @@
-# Contribuer a Coco Working
+# Contributing to Coco Working
 
-Merci de vouloir contribuer ! Voici comment participer.
+Thanks for wanting to contribute! Here's how to get started.
 
-## Demarrage rapide
+## Quick Start
 
 ```bash
-# Fork le repo puis clone
-git clone https://github.com/TON-USERNAME/cocoworking.git
+# Fork the repo then clone
+git clone https://github.com/YOUR-USERNAME/cocoworking.git
 cd cocoworking
 
-# Installe les dependances
+# Install dependencies
 pnpm install
 
-# Lance en dev (2 terminaux)
+# Start in dev mode (2 terminals)
 pnpm --filter @cocoworking/server dev
 pnpm --filter @cocoworking/client dev
 
-# Ouvre http://localhost:3000
+# Open http://localhost:3000
 ```
 
-## Avant de coder
+## Before Coding
 
-1. Regarde les [issues](https://github.com/cocolocow/cocoworking/issues) — celles taguees `good first issue` sont parfaites pour commencer
-2. Commente l'issue pour dire que tu la prends
-3. Cree une branche depuis `main`
+1. Check the [issues](https://github.com/cocolocow/cocoworking/issues) — those tagged `good first issue` are perfect to start with
+2. Comment on the issue to claim it
+3. Create a branch from `main`
 
 ## Conventions
 
-- **TypeScript strict** partout
-- **TDD** — ecris les tests avant le code
-- **Tests** : `pnpm -w run test` doit passer avant de push
-- **Logique metier** dans `packages/shared/` (fonctions pures, testables)
-- **Pas de over-engineering** — la solution la plus simple d'abord
+- **TypeScript strict** everywhere
+- **TDD** — write tests before code
+- **Tests**: `pnpm -w run test` must pass before pushing
+- **Business logic** in `packages/shared/` (pure functions, testable)
+- **No over-engineering** — simplest solution first
+- **English** for all code, comments, docs, and PRs
 
 ## Structure
 
 ```
 packages/
-  shared/   — Types, logique pure (isometrique, mouvement, DJ, Pomodoro)
-  server/   — Socket.IO, gestion des rooms
-  client/   — Phaser 3 + React, rendu, UI
+  shared/   — Types, pure logic (isometric, movement, DJ, Pomodoro)
+  server/   — Socket.IO, room management
+  client/   — Phaser 3 + React, rendering, UI
 ```
 
-## Lancer les tests
+## Running Tests
 
 ```bash
-pnpm -w run test        # Tout
-pnpm -w run test:unit   # Unit seulement
+pnpm -w run test        # Everything
+pnpm -w run test:unit   # Unit only
 ```
 
-## Soumettre une PR
+## Submitting a PR
 
-1. Une PR = un changement coherent
-2. Decris ce que ta PR fait et pourquoi
-3. Les tests passent
-4. Le type-check passe (`pnpm --filter @cocoworking/client lint`)
+1. One PR = one coherent change
+2. Describe what your PR does and why
+3. Tests pass
+4. Type-check passes (`pnpm --filter @cocoworking/client lint`)
 
 ## Assets
 
-Les assets pixel art (dossier `public/assets/tinyhouse/`) sont sous licence commerciale. Si tu ajoutes de nouveaux assets, assure-toi qu'ils sont libres de droits ou que tu as la licence.
+Pixel art assets in `public/assets/tinyhouse/` are under commercial license. If you add new assets, make sure they are royalty-free or properly licensed.
 
-## Questions ?
+## Questions?
 
-Ouvre une [issue](https://github.com/cocolocow/cocoworking/issues) ou contacte [@cocolocow](https://github.com/cocolocow).
+Open an [issue](https://github.com/cocolocow/cocoworking/issues) or reach out to [@cocolocow](https://github.com/cocolocow).

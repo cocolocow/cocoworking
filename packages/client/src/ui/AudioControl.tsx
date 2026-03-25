@@ -35,7 +35,7 @@ export function AudioControl({ onVolumeChange, onMuteToggle }: AudioControlProps
 
   return (
     <div style={styles.container}>
-      <button onClick={toggleMute} style={styles.muteBtn} title={muted ? "Activer le son" : "Couper le son"}>
+      <button onClick={toggleMute} style={styles.muteBtn} title={muted ? "Unmute" : "Mute"}>
         {muted || volume === 0 ? "🔇" : volume < 30 ? "🔈" : volume < 70 ? "🔉" : "🔊"}
       </button>
       <input

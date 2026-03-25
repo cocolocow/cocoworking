@@ -43,10 +43,10 @@ export function Lobby({ onJoin }: LobbyProps) {
     <div style={styles.overlay}>
       <div style={styles.card}>
         <h1 style={styles.title}>Coco Working</h1>
-        <p style={styles.subtitle}>Espace de co-working digital</p>
+        <p style={styles.subtitle}>Digital co-working space</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Ton nom</label>
+          <label style={styles.label}>Your name</label>
           <input
             type="text"
             value={name}
@@ -57,7 +57,7 @@ export function Lobby({ onJoin }: LobbyProps) {
             autoFocus
           />
 
-          <label style={{ ...styles.label, marginTop: 16 }}>Ta couleur</label>
+          <label style={{ ...styles.label, marginTop: 16 }}>Your color</label>
           <div style={styles.colors}>
             {COLOR_OPTIONS.map((c) => (
               <button
@@ -76,11 +76,11 @@ export function Lobby({ onJoin }: LobbyProps) {
           </div>
 
           <button type="submit" style={styles.joinBtn}>
-            Rejoindre
+            Join
           </button>
         </form>
 
-        <p style={styles.hint}>WASD ou fleches pour se deplacer</p>
+        <p style={styles.hint}>WASD or arrow keys to move</p>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ export function PlayerCount({ count }: PlayerCountProps) {
   return (
     <div style={styles.container}>
       <span style={styles.dot} />
-      {count} en ligne
+      {count} online
     </div>
   );
 }

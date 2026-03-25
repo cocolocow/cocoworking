@@ -66,7 +66,7 @@ export function PomodoroBar({ pomodoro, onStart, onStop, canStop }: PomodoroBarP
       </div>
 
       <div style={styles.hint}>
-        {isFocus ? "Mode focus — chat desactive" : "Pause — cameras on, discutez !"}
+        {isFocus ? "Focus mode — chat disabled" : "Break — cameras on, chat away!"}
       </div>
     </div>
   );
