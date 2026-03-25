@@ -15,13 +15,27 @@ interface LobbyProps {
   onJoin: (name: string, color: number) => void;
 }
 
+function loadSaved(): { name: string; color: number } {
+  try {
+    const raw = localStorage.getItem("cocoworking-profile");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { name: "", color: COLOR_OPTIONS[0].value };
+}
+
+function saveProfile(name: string, color: number) {
+  localStorage.setItem("cocoworking-profile", JSON.stringify({ name, color }));
+}
+
 export function Lobby({ onJoin }: LobbyProps) {
-  const [name, setName] = useState("");
-  const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0].value);
+  const saved = loadSaved();
+  const [name, setName] = useState(saved.name);
+  const [selectedColor, setSelectedColor] = useState(saved.color);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim() || `Coco${Math.floor(Math.random() * 999)}`;
+    saveProfile(trimmed, selectedColor);
     onJoin(trimmed, selectedColor);
   };
 

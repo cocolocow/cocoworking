@@ -55,8 +55,8 @@ export function AudioControl({ onVolumeChange, onMuteToggle }: AudioControlProps
 const styles: Record<string, React.CSSProperties> = {
   container: {
     position: "absolute",
-    bottom: 80,
-    left: 16,
+    bottom: 16,
+    left: 290,
     background: "rgba(0, 0, 0, 0.75)",
     borderRadius: 8,
     padding: "6px 10px",
