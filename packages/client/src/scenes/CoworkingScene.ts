@@ -121,6 +121,16 @@ export class CoworkingScene extends Phaser.Scene {
     this.load.image("sunflower", `${A}/decor/sunflower.png`);
     this.load.image("carpet", `${A}/decor/carpet.png`);
 
+    // Character spritesheets (512x512, 64x64 per frame)
+    // Idle: 4 columns x 8 rows (8 directions, 4 frames each)
+    this.load.spritesheet("char-idle", `${A}/character/idle.png`, {
+      frameWidth: 64, frameHeight: 64,
+    });
+    // Walk: 8 columns x 8 rows (8 directions, 8 frames each)
+    this.load.spritesheet("char-walk", `${A}/character/walk.png`, {
+      frameWidth: 64, frameHeight: 64,
+    });
+
     // Animation frames
     for (let i = 1; i <= 25; i++) {
       this.load.image(`lava-${i}`, `${A}/animations/lava_lamp/frame_${i}.png`);
@@ -223,6 +233,30 @@ export class CoworkingScene extends Phaser.Scene {
       frames: Array.from({ length: 20 }, (_, i) => ({ key: `cat-${i + 1}` })),
       frameRate: 5, repeat: -1,
     });
+
+    // Character animations — 8 directions
+    // Spritesheet layout: each row = 1 direction, columns = frames
+    // Idle: 4 cols x 8 rows, Walk: 8 cols x 8 rows
+    // Row order: S, SW, W, NW, N, NE, E, SE
+    const DIRS = ["south", "southwest", "west", "northwest", "north", "northeast", "east", "southeast"];
+    for (let d = 0; d < 8; d++) {
+      // Idle: 4 frames per direction, 4 columns per row (sheet is 512/64=8 cols but only 4 used)
+      this.anims.create({
+        key: `char-idle-${DIRS[d]}`,
+        frames: this.anims.generateFrameNumbers("char-idle", {
+          start: d * 4, end: d * 4 + 3,
+        }),
+        frameRate: 4, repeat: -1,
+      });
+      // Walk: 8 frames per direction
+      this.anims.create({
+        key: `char-walk-${DIRS[d]}`,
+        frames: this.anims.generateFrameNumbers("char-walk", {
+          start: d * 8, end: d * 8 + 7,
+        }),
+        frameRate: 10, repeat: -1,
+      });
+    }
   }
 
   // ─── Floor ────────────────────────────────────────
@@ -349,6 +383,7 @@ export class CoworkingScene extends Phaser.Scene {
     const target = applyMove(this.playerGridPos, { dx, dy }, ROOM_WIDTH, ROOM_HEIGHT);
 
     if (target.x === this.playerGridPos.x && target.y === this.playerGridPos.y) return;
+    if (!this.isInBounds(target)) return;
     if (!isWalkable(target, OBSTACLES)) return;
 
     this.playerDirection = direction;
@@ -442,15 +477,31 @@ export class CoworkingScene extends Phaser.Scene {
   private moveRemotePlayer(id: string, x: number, y: number) {
     const rp = this.remotePlayers.get(id);
     if (!rp) return;
+
+    // Determine direction from movement delta
+    const dx = x - rp.gridPos.x;
+    const dy = y - rp.gridPos.y;
+    let dir: Direction = "south";
+    if (dy < 0) dir = "north";
+    else if (dy > 0) dir = "south";
+    else if (dx < 0) dir = "west";
+    else if (dx > 0) dir = "east";
+
     rp.gridPos = { x, y };
     const screen = gridToScreen({ x, y });
+
+    this.playWalkAnim(rp.container, dir);
+
     this.tweens.add({
       targets: rp.container,
       x: screen.screenX + this.offsetX,
       y: screen.screenY + this.offsetY - TILE_HEIGHT,
       duration: MOVE_COOLDOWN,
       ease: "Power2",
-      onComplete: () => { rp.container.setDepth(getDepth({ x, y }) + 1); },
+      onComplete: () => {
+        rp.container.setDepth(getDepth({ x, y }) + 1);
+        this.playIdleAnim(rp.container, dir);
+      },
     });
   }
 
@@ -502,7 +553,9 @@ export class CoworkingScene extends Phaser.Scene {
   }
 
   private isInBounds(pos: { x: number; y: number }) {
-    return pos.x >= 0 && pos.x < ROOM_WIDTH && pos.y >= 0 && pos.y < ROOM_HEIGHT;
+    // x=0 and y=0 are wall rows
+    // Walls are on row 0 only. applyMove handles the upper bound (< ROOM_WIDTH).
+    return pos.x >= 1 && pos.x < ROOM_WIDTH && pos.y >= 1 && pos.y < ROOM_HEIGHT;
   }
 
   // ─── Movement ─────────────────────────────────────
@@ -511,6 +564,9 @@ export class CoworkingScene extends Phaser.Scene {
     this.isMoving = true;
     this.playerGridPos = target;
     const screen = gridToScreen(target);
+
+    // Play walk animation
+    this.playWalkAnim(this.playerContainer, this.playerDirection);
 
     this.tweens.add({
       targets: this.playerContainer,
@@ -521,6 +577,8 @@ export class CoworkingScene extends Phaser.Scene {
       onComplete: () => {
         this.playerContainer.setDepth(getDepth(this.playerGridPos) + 1);
         this.isMoving = false;
+        // Back to idle
+        this.playIdleAnim(this.playerContainer, this.playerDirection);
       },
     });
 
@@ -535,73 +593,60 @@ export class CoworkingScene extends Phaser.Scene {
     }
   }
 
-  // ─── Avatar (programmatic — until character pack) ─
+  // ─── Avatar (sprite-based) ─────────────────────
+
+  // Map our 4 movement directions to the 8-direction spritesheet
+  private static DIR_MAP: Record<Direction, string> = {
+    south: "south",
+    north: "north",
+    east: "east",
+    west: "west",
+  };
+
+  private directionToAnimDir(direction: Direction): string {
+    return CoworkingScene.DIR_MAP[direction] || "south";
+  }
 
   private createAvatarContainer(
     pos: { x: number; y: number },
-    color: number,
+    _color: number,
     name: string,
     direction: Direction,
   ): Phaser.GameObjects.Container {
     const screen = gridToScreen(pos);
     const sx = screen.screenX + this.offsetX;
     const sy = screen.screenY + this.offsetY - TILE_HEIGHT;
-    const g = this.add.graphics();
 
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(0, 20, 20, 8);
+    // Character sprite
+    const charSprite = this.add.sprite(0, 0, "char-idle", 0);
+    charSprite.setOrigin(0.5, 0.85);
+    charSprite.play(`char-idle-${this.directionToAnimDir(direction)}`);
 
-    const darker = Phaser.Display.Color.ValueToColor(color).darken(25).color;
-    const lighter = Phaser.Display.Color.ValueToColor(color).lighten(15).color;
-
-    g.fillStyle(darker, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(-8, -4), new Phaser.Geom.Point(0, 0),
-      new Phaser.Geom.Point(0, 14), new Phaser.Geom.Point(-8, 10),
-    ], true);
-
-    g.fillStyle(color, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(8, -4), new Phaser.Geom.Point(0, 0),
-      new Phaser.Geom.Point(0, 14), new Phaser.Geom.Point(8, 10),
-    ], true);
-
-    g.fillStyle(lighter, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(0, -8), new Phaser.Geom.Point(8, -4),
-      new Phaser.Geom.Point(0, 0), new Phaser.Geom.Point(-8, -4),
-    ], true);
-
-    const headY = -16;
-    g.fillStyle(0xfad390, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(-6, headY), new Phaser.Geom.Point(0, headY - 4),
-      new Phaser.Geom.Point(6, headY), new Phaser.Geom.Point(0, headY + 4),
-    ], true);
-
-    g.fillStyle(darker, 1);
-    g.fillPoints([
-      new Phaser.Geom.Point(-6, headY - 2), new Phaser.Geom.Point(0, headY - 6),
-      new Phaser.Geom.Point(6, headY - 2), new Phaser.Geom.Point(0, headY),
-    ], true);
-
-    g.fillStyle(0x2d3436, 1);
-    if (direction === "south" || direction === "east") {
-      g.fillCircle(2, headY - 1, 1);
-      g.fillCircle(5, headY, 1);
-    } else {
-      g.fillCircle(-2, headY - 1, 1);
-      g.fillCircle(-5, headY, 1);
-    }
-
-    const label = this.add.text(0, -30, name, {
+    // Name label above head
+    const label = this.add.text(0, -40, name, {
       fontSize: "9px", fontFamily: "monospace", color: "#ffffff",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5);
 
-    const container = this.add.container(sx, sy, [g, label]);
+    const container = this.add.container(sx, sy, [charSprite, label]);
     container.setDepth(getDepth(pos) + 1);
     return container;
+  }
+
+  private playWalkAnim(container: Phaser.GameObjects.Container, direction: Direction) {
+    const charSprite = container.getAt(0) as Phaser.GameObjects.Sprite;
+    const animKey = `char-walk-${this.directionToAnimDir(direction)}`;
+    if (charSprite.anims.currentAnim?.key !== animKey) {
+      charSprite.play(animKey);
+    }
+  }
+
+  private playIdleAnim(container: Phaser.GameObjects.Container, direction: Direction) {
+    const charSprite = container.getAt(0) as Phaser.GameObjects.Sprite;
+    const animKey = `char-idle-${this.directionToAnimDir(direction)}`;
+    if (charSprite.anims.currentAnim?.key !== animKey) {
+      charSprite.play(animKey);
+    }
   }
 }
 

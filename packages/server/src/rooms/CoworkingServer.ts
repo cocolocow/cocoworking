@@ -216,9 +216,9 @@ function isValidPosition(x: number, y: number): boolean {
   return (
     Number.isInteger(x) &&
     Number.isInteger(y) &&
-    x >= 0 &&
+    x >= 1 &&
     x < 10 &&
-    y >= 0 &&
+    y >= 1 &&
     y < 10
   );
 }

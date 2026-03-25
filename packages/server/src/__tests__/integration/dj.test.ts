@@ -29,7 +29,11 @@ function waitFor<T>(socket: Socket, event: string): Promise<T> {
 
 describe("DJ integration", () => {
   let sockets: Socket[] = [];
-  afterEach(() => { sockets.forEach((s) => s.disconnect()); sockets = []; });
+  afterEach(async () => {
+    sockets.forEach((s) => s.disconnect());
+    sockets = [];
+    await new Promise((r) => setTimeout(r, 150));
+  });
 
   it("sends DJ state on connect", async () => {
     const s = connect("Coco");
