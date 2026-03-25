@@ -424,7 +424,10 @@ export class CoworkingScene extends Phaser.Scene {
   // ─── Network ──────────────────────────────────────
 
   private connectToServer() {
-    const serverUrl = `http://${window.location.hostname}:2567`;
+    // In production, client and server are on the same origin.
+    // In dev, client is on :3000 and server on :2567.
+    const isDev = window.location.port === "3000";
+    const serverUrl = isDev ? `http://${window.location.hostname}:2567` : window.location.origin;
 
     this.network = new NetworkManager(serverUrl, this.playerName, {
       onRoomState: (players) => {
