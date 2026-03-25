@@ -6,6 +6,8 @@ A virtual workspace inspired by Habbo Hotel where you can join a room, work alon
 
 100% browser-based. Nothing to install.
 
+**Try it now:** [cocoworkingserver-production.up.railway.app](https://cocoworkingserver-production.up.railway.app/)
+
 ![Coco Working Screenshot](docs/screenshot.png)
 
 ## Features
